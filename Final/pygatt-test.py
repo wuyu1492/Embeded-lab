@@ -78,42 +78,6 @@ def handle_data(handle, value):
     """
     print("Received data: %s" % hexlify(value))
 
-def pytest(address=DEVICE_ADDRESS, type=pygatt.BLEAddressType.public):
-    try:
-        adapter.start()
-
-        print "===== adapter.connect() ====="
-        device = adapter.connect(address, address_type=type)
-        print "address: " + str(device._address)
-        #print "handle : " + str(device.get_handle)
-        #print "rssi   : " + str(device.get_rssi())
-
-        print "====== device.discover_characteristics() ====="
-        for uuid in device.discover_characteristics().keys():
-            try:
-                print("Read UUID %s (handle %d): %s" %
-                      (uuid, device.get_handle(uuid), binascii.hexlify(device.char_read(uuid))))
-            except:
-                print("Read UUID %s (handle %d): %s" %
-                      (uuid, device.get_handle(uuid), "!deny!"))
-
-        char_uuid = "0000ffe2-0000-1000-8000-00805f9b34fb"
-        #device.subscribe(char_uuid,callback=indication_callback, indication=True)
-        # device.receive_notification(8, "test")
-
-        print "====== device.char_write_handle() ====="
-        in_buf = map(ord, "hello!X1010Y2525!!!")
-        # send via uuid & handle, maximum is 20 bytes
-        #char_uuid = 0xFFE2
-        device.char_write(char_uuid, in_buf[:20])
-        #char_hnd = device.get_handle(char_uuid)
-        #device.char_write_handle(char_hnd, in_buf[20:])
-
-        while (True):
-            time.sleep(0.1)
-    finally:
-        adapter.stop()
-
 
 def main():
 	write_uuid = "0000ffe2-0000-1000-8000-00805f9b34fb"
