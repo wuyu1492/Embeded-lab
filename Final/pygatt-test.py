@@ -9,42 +9,41 @@ import threading
 ADDRESS_TYPE = pygatt.BLEAddressType.public
 DEVICE_ADDRESS = "34:15:13:87:DD:D8"
 
-#adapter = pygatt.GATTToolBackend()
 
-class writeThread (threading.Thread):
-	def __init__(self, threadID, name, device, uuid, buf):
-		threading.Thread.__init__(self)
-		self.threadID = threadID
-		self.name = name
-		self.device = device
-		self.uuid = uuid
-		self.buf = buf
-		print("Initialized successful!!!")
-		#self.run
+class writeEvent(threading._Event):
+	def __init__(self):
+		self.write_str="Empty Event"
+		threading._Event.__init__(self)
 
-	def run(self):
-		print "starting " + self.name
-		write_pos()
-		print "Exiting "+self.name
+	def set_str(self, str):
+		self.write_str = str
 
-	def write_pos(self):
-		self.device.char_write(self.uuid, self.buf[:20])
-		self.device.char_write(self.uuid, self.buf[20:])
 
-def write_pos(device, uuid, str):
-	print "Start writing " + str
-	in_buf = map(ord, str)
-	device.char_write(uuid, in_buf[:20])
-	device.char_write(uuid, in_buf[20:])
 
+def write_pos(e, device, uuid):
+	while not e.isSet():
+		print "waiting for write to arduino events..."
+		try:
+			event_is_set = e.wait(5)
+			if event_is_set:
+				str = e.write_str
+				print "Start writing " + str
+				in_buf = map(ord, str)
+				device.char_write(uuid, in_buf[:20])
+				device.char_write(uuid, in_buf[20:])
+				e.clear()
+				print "Finish processing writing event, event cleared, event set: %s"%(event_is_set)
+			else:
+				print "Doing other things"
+		except KeyboardInterrupt:
+			break
 
 class myThread (threading.Thread):
-	def __init__(self, threadID=0, name="thread0", address="34:15:13:87:DD:D8", addr_type=pygatt.BLEAddressType.public):
-		threading.Thread.__init__(self)
-		self.threadID = threadID
-		self.name = name
+	def __init__(self, event, threadID=0, address="34:15:13:87:DD:D8", addr_type=pygatt.BLEAddressType.public):
+		#threading.Thread.__init__(self)
 		self.address = address
 		self.type = addr_type
+		self.write_uuid = "0000ffe2-0000-1000-8000-00805f9b34fb"
 		try:
 			self.adapter = pygatt.GATTToolBackend()
 			self.adapter.start()
@@ -54,16 +53,9 @@ class myThread (threading.Thread):
 		except:
 			print "Cannot start adapter"
 		print "myThread Initialized successful!!"
-
-		def run(self):		
-			print "====== device.discover_characteristics() ====="
-	        for uuid in self.device.discover_characteristics().keys():
-	            try:
-	                print("Read UUID %s (handle %d): %s" %
-	                      (uuid, self.device.get_handle(uuid), binascii.hexlify(self.device.char_read(uuid))))
-	            except:
-	                print("Read UUID %s (handle %d): %s" %
-	                      (uuid, self.device.get_handle(uuid), "!deny!"))
+		threading.Thread.__init__(self, target=write_pos, args=(event, self.device, self.write_uuid))
+		self.threadID = threadID
+		self.name = "device connection thread"
 
 	    #return device
 
@@ -80,23 +72,31 @@ def handle_data(handle, value):
 
 
 def main():
-	write_uuid = "0000ffe2-0000-1000-8000-00805f9b34fb"
-	thread = myThread()
+	#write_uuid = "0000ffe2-0000-1000-8000-00805f9b34fb"
+
+	e = writeEvent()
+
+	thread = myThread(e)
 	thread.start()
 	device = thread.device
 	print "====== device.char_write_handle() ====="
-	write_str = "hello!X1010Y2525!!!"
-	#in_buf = map(ord, write_str)
-	#wt = writeThread(1, "writeThread", device, write_uuid, in_buf)
-	#wt.start()
+	#write_str = "hello!X1010Y2525!!!"
+	e.set_str("hello!X1010Y2525!!!")
+	
 	if device != None:
-		write_pos(device, write_uuid, write_str)
+		e.set()
+		#write_pos(device, write_uuid, write_str)
 	else:
 		print "Device is None!!!"
+
 	for i in range(3):
 		time.sleep(10)
-		write_str = "smhX%d010Y%d525"%(i, i)
-		write_pos(device, write_uuid, write_str)
+		#write_str = "smhX%d010Y%d525"%(i, i)
+		e.set_str("smhX%d010Y%d525"%(i, i))
+		#write_pos(device, write_uuid, write_str)
+		e.set()
+
+	thread.exit()
 	adapter.stop()
 
 
